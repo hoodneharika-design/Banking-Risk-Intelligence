@@ -1,0 +1,199 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import joblib
+
+# Page config
+st.set_page_config(
+    page_title="Banking Risk Intelligence System",
+    page_icon="🏦",
+    layout="wide"
+)
+
+# Load models
+@st.cache_resource
+def load_models():
+    fraud_model = joblib.load('fraud_model.pkl')
+    loan_model = joblib.load('loan_model.pkl')
+    loan_scaler = joblib.load('loan_scaler.pkl')
+    loan_features = joblib.load('loan_features.pkl')
+    return fraud_model, loan_model, loan_scaler, loan_features
+
+fraud_model, loan_model, loan_scaler, loan_features = load_models()
+
+# Header
+st.title("🏦 Banking Risk Intelligence System")
+st.markdown("### AI-Powered Fraud Detection & Loan Default Prediction")
+st.markdown("---")
+
+# Sidebar navigation
+module = st.sidebar.selectbox(
+    "🔍 Select Module",
+    ["🏠 Home", "💳 Fraud Detection", "📋 Loan Default Prediction"]
+)
+
+# ─────────────────────────────────────────
+# HOME PAGE
+# ─────────────────────────────────────────
+if module == "🏠 Home":
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("""
+        ## 💳 Fraud Detection
+        - Analyzes transaction patterns
+        - XGBoost ML Model
+        - ROC-AUC Score: **0.9739**
+        - Catches **88%** of all frauds
+        """)
+        if st.button("Go to Fraud Detection →"):
+            st.info("Select 'Fraud Detection' from the sidebar")
+
+    with col2:
+        st.markdown("""
+        ## 📋 Loan Default Prediction
+        - Analyzes customer profile
+        - XGBoost ML Model
+        - Generates Risk Score (0-100%)
+        - Risk Level: LOW / MEDIUM / HIGH
+        """)
+        if st.button("Go to Loan Default →"):
+            st.info("Select 'Loan Default Prediction' from the sidebar")
+
+    st.markdown("---")
+    st.markdown("### 📊 System Performance")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Fraud ROC-AUC", "0.9739", "Excellent")
+    col2.metric("Fraud Recall", "88%", "High")
+    col3.metric("Frauds Caught", "86/98", "In test set")
+    col4.metric("Loan Accuracy", "~82%", "Good")
+
+# ─────────────────────────────────────────
+# FRAUD DETECTION PAGE
+# ─────────────────────────────────────────
+elif module == "💳 Fraud Detection":
+    st.header("💳 Transaction Fraud Detector")
+    st.markdown("Enter transaction details to check if it's fraudulent")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Transaction Details")
+        amount = st.number_input("Transaction Amount (₹)", 
+                                  min_value=0.0, value=1000.0, step=100.0)
+        v1 = st.slider("V1 (PCA Feature)", -5.0, 5.0, 0.0)
+        v2 = st.slider("V2 (PCA Feature)", -5.0, 5.0, 0.0)
+        v3 = st.slider("V3 (PCA Feature)", -5.0, 5.0, 0.0)
+        v4 = st.slider("V4 (PCA Feature)", -5.0, 5.0, 0.0)
+
+    with col2:
+        st.subheader("More Features")
+        v14 = st.slider("V14 (Top Fraud Indicator)", -15.0, 5.0, 0.0)
+        v12 = st.slider("V12 (PCA Feature)", -10.0, 5.0, 0.0)
+        v10 = st.slider("V10 (PCA Feature)", -10.0, 5.0, 0.0)
+        v17 = st.slider("V17 (PCA Feature)", -10.0, 5.0, 0.0)
+        v11 = st.slider("V11 (PCA Feature)", -5.0, 10.0, 0.0)
+
+    if st.button("🔍 Analyze Transaction", use_container_width=True):
+        # Build input with all 29 features (set others to 0)
+        features = np.zeros(29)
+        features[0] = v1
+        features[1] = v2
+        features[2] = v3
+        features[3] = v4
+        features[10] = v11
+        features[9] = v10
+        features[11] = v12
+        features[13] = v14
+        features[16] = v17
+        features[28] = amount  # NormalizedAmount
+
+        prediction = fraud_model.predict([features])[0]
+        probability = fraud_model.predict_proba([features])[0][1]
+
+        st.markdown("---")
+        st.subheader("🎯 Analysis Result")
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Fraud Probability", f"{probability*100:.1f}%")
+        col2.metric("Prediction", "FRAUD 🚨" if prediction == 1 else "NORMAL ✅")
+        col3.metric("Confidence", f"{max(probability, 1-probability)*100:.1f}%")
+
+        if prediction == 1:
+            st.error("🚨 ALERT: This transaction is likely FRAUDULENT! Recommend blocking.")
+        else:
+            st.success("✅ This transaction appears LEGITIMATE. Safe to proceed.")
+
+# ─────────────────────────────────────────
+# LOAN DEFAULT PAGE
+# ─────────────────────────────────────────
+elif module == "📋 Loan Default Prediction":
+    st.header("📋 Loan Default Risk Assessor")
+    st.markdown("Enter customer details to predict default risk")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.subheader("Personal Info")
+        limit_bal = st.number_input("Credit Limit (₹)", 10000, 1000000, 50000, 10000)
+        sex = st.selectbox("Gender", [1, 2], format_func=lambda x: "Male" if x==1 else "Female")
+        education = st.selectbox("Education", [1,2,3,4], 
+                    format_func=lambda x: {1:"Graduate",2:"University",3:"High School",4:"Others"}[x])
+        marriage = st.selectbox("Marital Status", [1,2,3],
+                    format_func=lambda x: {1:"Married",2:"Single",3:"Others"}[x])
+        age = st.slider("Age", 18, 80, 30)
+
+    with col2:
+        st.subheader("Payment History")
+        pay_0 = st.selectbox("Last Month Payment", [-1,0,1,2,3,4,5,6,7,8,9],
+                    format_func=lambda x: "Paid on time" if x<=0 else f"{x} months delayed")
+        pay_2 = st.selectbox("2 Months Ago", [-1,0,1,2,3],
+                    format_func=lambda x: "Paid on time" if x<=0 else f"{x} months delayed")
+        pay_3 = st.selectbox("3 Months Ago", [-1,0,1,2,3],
+                    format_func=lambda x: "Paid on time" if x<=0 else f"{x} months delayed")
+        bill_amt1 = st.number_input("Last Bill Amount (₹)", 0, 500000, 10000, 1000)
+        bill_amt2 = st.number_input("Previous Bill Amount (₹)", 0, 500000, 10000, 1000)
+
+    with col3:
+        st.subheader("Payment Amounts")
+        pay_amt1 = st.number_input("Last Payment Made (₹)", 0, 500000, 5000, 1000)
+        pay_amt2 = st.number_input("Previous Payment Made (₹)", 0, 500000, 5000, 1000)
+        pay_amt3 = st.number_input("Payment 3 Months Ago (₹)", 0, 500000, 5000, 1000)
+        pay_4 = st.selectbox("4 Months Ago", [-1,0,1,2,3],
+                    format_func=lambda x: "Paid on time" if x<=0 else f"{x} months delayed")
+        pay_5 = st.selectbox("5 Months Ago", [-1,0,1,2,3],
+                    format_func=lambda x: "Paid on time" if x<=0 else f"{x} months delayed")
+
+    if st.button("🔍 Predict Default Risk", use_container_width=True):
+        # Build full feature vector (23 features)
+        input_data = pd.DataFrame([[
+            limit_bal, sex, education, marriage, age,
+            pay_0, pay_2, pay_3, pay_4, pay_5, 0,
+            bill_amt1, bill_amt2, 0, 0, 0, 0,
+            pay_amt1, pay_amt2, pay_amt3, 0, 0, 0
+        ]], columns=loan_features)
+
+        input_scaled = loan_scaler.transform(input_data)
+        risk_score = loan_model.predict_proba(input_scaled)[0][1] * 100
+        prediction = loan_model.predict(input_scaled)[0]
+
+        st.markdown("---")
+        st.subheader("🎯 Risk Assessment Result")
+
+        if risk_score > 60:
+            risk_level = "🔴 HIGH RISK"
+            recommendation = "❌ Recommend REJECTING this loan application"
+            st.error(f"{risk_level} — {recommendation}")
+        elif risk_score > 30:
+            risk_level = "🟡 MEDIUM RISK"
+            recommendation = "⚠️ Recommend REVIEWING with additional documents"
+            st.warning(f"{risk_level} — {recommendation}")
+        else:
+            risk_level = "🟢 LOW RISK"
+            recommendation = "✅ Recommend APPROVING this loan application"
+            st.success(f"{risk_level} — {recommendation}")
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Default Risk Score", f"{risk_score:.1f}%")
+        col2.metric("Risk Level", risk_level.split()[1])
+        col3.metric("Recommendation", "Approve" if risk_score < 30 else "Review/Reject")

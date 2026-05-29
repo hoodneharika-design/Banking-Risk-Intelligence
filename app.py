@@ -73,57 +73,171 @@ if module == "🏠 Home":
 # ─────────────────────────────────────────
 elif module == "💳 Fraud Detection":
     st.header("💳 Transaction Fraud Detector")
-    st.markdown("Enter transaction details to check if it's fraudulent")
+    st.markdown("Enter real transaction details below")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("Transaction Details")
-        amount = st.number_input("Transaction Amount (₹)", 
-                                  min_value=0.0, value=1000.0, step=100.0)
-        v1 = st.slider("V1 (PCA Feature)", -5.0, 5.0, 0.0)
-        v2 = st.slider("V2 (PCA Feature)", -5.0, 5.0, 0.0)
-        v3 = st.slider("V3 (PCA Feature)", -5.0, 5.0, 0.0)
-        v4 = st.slider("V4 (PCA Feature)", -5.0, 5.0, 0.0)
+        st.subheader("🧾 Transaction Info")
+        amount = st.number_input(
+            "Transaction Amount (₹)", 
+            min_value=0.0, value=1000.0, step=100.0,
+            help="The amount of this transaction")
+        
+        hour = st.slider(
+            "Hour of Transaction (24hr format)", 
+            0, 23, 14,
+            help="0 = midnight, 14 = 2PM, 23 = 11PM")
+        
+        transaction_type = st.selectbox(
+            "Transaction Type",
+            ["Online Purchase", "ATM Withdrawal", 
+             "POS/Swipe", "Wire Transfer", "International"])
+        
+        location_match = st.selectbox(
+            "Location matches customer's city?",
+            ["Yes — same city", 
+             "No — different city", 
+             "No — different country"])
+        
+        device_known = st.selectbox(
+            "Device/IP recognized?",
+            ["Yes — known device", 
+             "No — new device", 
+             "No — suspicious IP"])
 
     with col2:
-        st.subheader("More Features")
-        v14 = st.slider("V14 (Top Fraud Indicator)", -15.0, 5.0, 0.0)
-        v12 = st.slider("V12 (PCA Feature)", -10.0, 5.0, 0.0)
-        v10 = st.slider("V10 (PCA Feature)", -10.0, 5.0, 0.0)
-        v17 = st.slider("V17 (PCA Feature)", -10.0, 5.0, 0.0)
-        v11 = st.slider("V11 (PCA Feature)", -5.0, 10.0, 0.0)
+        st.subheader("👤 Customer Profile")
+        
+        age = st.slider("Customer Age", 18, 80, 35)
+        
+        avg_transaction = st.number_input(
+            "Customer's Usual Avg Transaction (₹)",
+            min_value=0.0, value=2000.0, step=500.0,
+            help="What does this customer usually spend?")
+        
+        transactions_today = st.number_input(
+            "Number of transactions in last 1 hour",
+            min_value=0, max_value=20, value=1,
+            help="High frequency = suspicious")
+        
+        card_present = st.selectbox(
+            "Card physically present?",
+            ["Yes — card swiped", 
+             "No — card number used online",
+             "No — contactless"])
+        
+        previous_fraud = st.selectbox(
+            "Previous fraud history on this account?",
+            ["No previous fraud", 
+             "1 suspicious transaction before",
+             "Multiple fraud attempts"])
 
     if st.button("🔍 Analyze Transaction", use_container_width=True):
-        # Build input with all 29 features (set others to 0)
+        
+        # ── Convert user inputs into model features ──
+
+        # Normalize amount (same way we trained)
+        norm_amount = (amount - 88.35) / 250.12
+
+        # Time feature (convert hour to seconds roughly)
+        time_val = hour * 3600
+
+        # Location risk score
+        location_score = {
+            "Yes — same city": 0.1,
+            "No — different city": -2.5,
+            "No — different country": -5.0
+        }[location_match]
+
+        # Device risk
+        device_score = {
+            "Yes — known device": 0.1,
+            "No — new device": -2.0,
+            "No — suspicious IP": -4.5
+        }[device_known]
+
+        # Transaction type risk
+        type_score = {
+            "Online Purchase": -1.0,
+            "ATM Withdrawal": -0.5,
+            "POS/Swipe": 0.1,
+            "Wire Transfer": -3.0,
+            "International": -4.0
+        }[transaction_type]
+
+        # Frequency risk
+        freq_score = -1.0 * min(transactions_today, 10)
+
+        # Amount vs average ratio
+        amount_ratio = amount / (avg_transaction + 1)
+        amount_anomaly = -2.0 if amount_ratio > 5 else \
+                         -1.0 if amount_ratio > 3 else 0.1
+
+        # Previous fraud
+        fraud_history = {
+            "No previous fraud": 0.1,
+            "1 suspicious transaction before": -2.0,
+            "Multiple fraud attempts": -5.0
+        }[previous_fraud]
+
+        # Night time risk (midnight to 5am = suspicious)
+        night_risk = -2.5 if hour <= 5 else \
+                     -1.0 if hour <= 7 else 0.1
+
+        # Build 29-feature vector for model
         features = np.zeros(29)
-        features[0] = v1
-        features[1] = v2
-        features[2] = v3
-        features[3] = v4
-        features[10] = v11
-        features[9] = v10
-        features[11] = v12
-        features[13] = v14
-        features[16] = v17
-        features[28] = amount  # NormalizedAmount
+        features[0]  = location_score        # maps to V1
+        features[1]  = device_score          # maps to V2
+        features[2]  = type_score            # maps to V3
+        features[3]  = amount_anomaly        # maps to V4
+        features[9]  = freq_score            # maps to V10
+        features[10] = night_risk            # maps to V11
+        features[11] = fraud_history         # maps to V12
+        features[13] = location_score * 1.5  # maps to V14 (strongest)
+        features[16] = device_score * 1.2    # maps to V17
+        features[28] = norm_amount           # NormalizedAmount
 
         prediction = fraud_model.predict([features])[0]
         probability = fraud_model.predict_proba([features])[0][1]
 
+        # ── Show Results ──
         st.markdown("---")
-        st.subheader("🎯 Analysis Result")
+        st.subheader("🎯 Fraud Analysis Result")
 
         col1, col2, col3 = st.columns(3)
         col1.metric("Fraud Probability", f"{probability*100:.1f}%")
-        col2.metric("Prediction", "FRAUD 🚨" if prediction == 1 else "NORMAL ✅")
-        col3.metric("Confidence", f"{max(probability, 1-probability)*100:.1f}%")
+        col2.metric("Decision", "🚨 FRAUD" if prediction==1 else "✅ NORMAL")
+        col3.metric("Amount", f"₹{amount:,.0f}")
 
         if prediction == 1:
-            st.error("🚨 ALERT: This transaction is likely FRAUDULENT! Recommend blocking.")
+            st.error("🚨 HIGH RISK: This transaction is likely FRAUDULENT!")
+            st.markdown("**⚠️ Recommended Actions:**")
+            st.markdown("- 🔒 Block this transaction immediately")
+            st.markdown("- 📞 Call customer to verify")
+            st.markdown("- 🔍 Flag account for review")
         else:
-            st.success("✅ This transaction appears LEGITIMATE. Safe to proceed.")
+            st.success("✅ LOW RISK: This transaction appears LEGITIMATE")
+            st.markdown("**✔️ Safe to proceed with transaction**")
 
+        # Risk breakdown
+        st.markdown("---")
+        st.subheader("📊 Risk Factor Breakdown")
+        
+        risk_factors = {
+            "Location Risk": abs(location_score),
+            "Device Risk": abs(device_score),
+            "Transaction Type": abs(type_score),
+            "Night Time Risk": abs(night_risk),
+            "Amount Anomaly": abs(amount_anomaly),
+            "Fraud History": abs(fraud_history),
+            "Frequency Risk": abs(freq_score)
+        }
+        
+        for factor, score in sorted(
+            risk_factors.items(), key=lambda x: x[1], reverse=True):
+            level = "🔴" if score >= 3 else "🟡" if score >= 1.5 else "🟢"
+            st.write(f"{level} **{factor}:** {score:.1f}/5.0")
 # ─────────────────────────────────────────
 # LOAN DEFAULT PAGE
 # ─────────────────────────────────────────

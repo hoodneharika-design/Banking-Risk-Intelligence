@@ -25,18 +25,32 @@ st.markdown("""
     .sub-header {
         font-size: 1rem; color: #6c757d; margin-bottom: 1.5rem;
     }
-    .fraud-alert {
-        background-color: #ffe0e0; border-left: 5px solid #ff4444;
-        padding: 1rem; border-radius: 8px; margin: 1rem 0;
-    }
-    .safe-alert {
-        background-color: #e0ffe0; border-left: 5px solid #00c851;
-        padding: 1rem; border-radius: 8px; margin: 1rem 0;
-    }
-    .warning-alert {
+   .fraud-alert {
+    background-color: #ffe0e0; border-left: 5px solid #ff4444;
+    padding: 1rem; border-radius: 8px; margin: 1rem 0;
+    color: #1a1a2e !important;
+}
+.fraud-alert h3 { color: #cc0000 !important; }
+.fraud-alert li { color: #1a1a2e !important; }
+.fraud-alert p  { color: #1a1a2e !important; }
+
+.safe-alert {
+    background-color: #e0ffe0; border-left: 5px solid #00c851;
+    padding: 1rem; border-radius: 8px; margin: 1rem 0;
+    color: #1a1a2e !important;
+}
+.safe-alert h3 { color: #007a33 !important; }
+.safe-alert li { color: #1a1a2e !important; }
+.safe-alert p  { color: #1a1a2e !important; }
+
+.warning-alert {
     background-color: #fff8e0; border-left: 5px solid #ffbb33;
     padding: 1rem; border-radius: 8px; margin: 1rem 0;
     color: #1a1a2e !important;
+}
+.warning-alert h3 { color: #996600 !important; }
+.warning-alert li { color: #1a1a2e !important; }
+.warning-alert p  { color: #1a1a2e !important; }
 }
     .section-header {
         font-size: 1.05rem; font-weight: 600; color: #1a1a2e;
@@ -303,7 +317,7 @@ elif module == "💳 Fraud Detection":
         c4.metric("Risk Level","HIGH 🔴" if score>=65 else "MEDIUM 🟡" if score>=45 else "LOW 🟢")
 
         if score >= 65:
-            st.markdown("""<div class="fraud-alert">
+            st.markdown("""<div class="fraud-alert">style="color:#1a1a2e">
             <h3>🚨 HIGH RISK — Fraudulent Transaction Detected</h3>
             <ul>
             <li>🔒 Block this transaction immediately</li>
@@ -320,7 +334,7 @@ elif module == "💳 Fraud Detection":
             <li>📝 Log transaction for monitoring</li>
             </ul></div>""", unsafe_allow_html=True)
         else:
-            st.markdown("""<div class="safe-alert">
+            st.markdown("""<div class="safe-alert">style="color:#1a1a2e">
             <h3>✅ LOW RISK — Transaction Approved</h3>
             <p>No significant risk signals detected. Safe to process.</p>
             </div>""", unsafe_allow_html=True)
@@ -419,9 +433,17 @@ elif module == "📋 Loan Default Prediction":
                     bill_amt1, bill_amt2, bill_amt3, 0, 0, 0,
                     pay_amt1,  pay_amt2,  pay_amt3,  0, 0, 0
                 ]], columns=models['features'])
-                scaled = models['scaler'].transform(inp)
-                risk   = round(models['loan'].predict_proba(scaled)[0][1] * 100, 1)
 
+                # Scale only continuous columns — categorical ones stay as-is
+                categorical_cols = ['SEX', 'EDUCATION', 'MARRIAGE']
+                continuous_cols  = [c for c in models['features']
+                                    if c not in categorical_cols]
+
+                inp_final = inp.copy()
+                inp_final[continuous_cols] = models['scaler'].transform(inp[continuous_cols])
+
+                risk = round(models['loan'].predict_proba(inp_final)[0][1] * 100, 1)
+        
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Default Risk",   f"{risk}%")
             c2.metric("Credit Limit",   f"₹{limit_bal:,}")
@@ -429,7 +451,7 @@ elif module == "📋 Loan Default Prediction":
             c4.metric("Credit Used",    f"{util:.0f}%")
 
             if risk > 60:
-                st.markdown(f"""<div class="fraud-alert">
+                st.markdown(f"""<div class="fraud-alert">style="color:#1a1a2e">
                 <h3>🔴 HIGH RISK — Reject Application ({risk}%)</h3>
                 <ul>
                 <li>❌ Reject this loan application</li>
@@ -437,7 +459,7 @@ elif module == "📋 Loan Default Prediction":
                 <li>🔁 Customer may reapply after improving payment history</li>
                 </ul></div>""", unsafe_allow_html=True)
             elif risk > 30:
-                st.markdown(f"""<div class="warning-alert">
+                st.markdown(f"""<div class="warning-alert">style="color:#1a1a2e">
                 <h3>🟡 MEDIUM RISK — Manual Review Required ({risk}%)</h3>
                 <ul>
                 <li>🔍 Conduct detailed financial review</li>
@@ -445,7 +467,7 @@ elif module == "📋 Loan Default Prediction":
                 <li>💰 Consider approving a reduced loan amount</li>
                 </ul></div>""", unsafe_allow_html=True)
             else:
-                st.markdown(f"""<div class="safe-alert">
+                st.markdown(f"""<div class="safe-alert">style="color:#1a1a2e">
                 <h3>🟢 LOW RISK — Approve Application ({risk}%)</h3>
                 <ul>
                 <li>✅ Approve loan application</li>

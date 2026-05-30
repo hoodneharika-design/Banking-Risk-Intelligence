@@ -34,9 +34,10 @@ st.markdown("""
         padding: 1rem; border-radius: 8px; margin: 1rem 0;
     }
     .warning-alert {
-        background-color: #fff8e0; border-left: 5px solid #ffbb33;
-        padding: 1rem; border-radius: 8px; margin: 1rem 0;
-    }
+    background-color: #fff8e0; border-left: 5px solid #ffbb33;
+    padding: 1rem; border-radius: 8px; margin: 1rem 0;
+    color: #1a1a2e !important;
+}
     .section-header {
         font-size: 1.05rem; font-weight: 600; color: #1a1a2e;
         border-bottom: 2px solid #667eea;
@@ -311,7 +312,7 @@ elif module == "💳 Fraud Detection":
             <li>📝 Initiate fraud investigation</li>
             </ul></div>""", unsafe_allow_html=True)
         elif score >= 45:
-            st.markdown("""<div class="warning-alert">
+           st.markdown("""<div class="warning-alert" style="color:#1a1a2e">
             <h3>🟡 MEDIUM RISK — Transaction Requires Review</h3>
             <ul>
             <li>⏸️ Hold transaction for manual verification</li>
